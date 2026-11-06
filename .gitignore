@@ -1,0 +1,17 @@
+# Local configuration.
+.env
+
+# Build artifacts.
+out/
+cache/
+dependencies/
+broadcast/
+broadcast-fork/
+anvil.log
+
+# Editor artifacts.
+.claude/
+.idea/
+.vscode/
+*.swp
+*~

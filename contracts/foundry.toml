@@ -1,0 +1,83 @@
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["dependencies"]
+optimizer = true
+optimizer_runs = 200
+
+# Tests and scripts read compiled artifacts (`vm.getCode`) so that they never
+# have to import the `pragma solidity 0.8.17` Blur Pool sources directly.
+fs_permissions = [{ access = "read", path = "./out" }]
+
+# forge-std trips hundreds of solc 0.8.36 deprecation warnings that are not
+# ours to fix, which in turn trips solc's "more than 256 warnings" notice
+# (4591). Foundry's default ignored codes are kept alongside it.
+ignored_warnings_from = ["dependencies/"]
+ignored_error_codes = [
+  "license",
+  "code-size",
+  "init-code-size",
+  "transient-storage",
+  4591,
+]
+
+# Emit storage layouts so `test/Fidelity.t.sol` can prove the patch leaves the
+# layout of `BlurPool` untouched.
+extra_output = ["storageLayout"]
+
+# Map standard import paths to Soldeer locations.
+#
+# Blur's verified `BlurPool.sol` imports OpenZeppelin by literal repository
+# path (`lib/openzeppelin-contracts-upgradeable/contracts/...`) rather than
+# through a remapping. Remapping that literal prefix onto the Soldeer copy of
+# the identical 4.8.3 release lets both the pristine upstream file and the
+# patched file compile with their import lines untouched.
+remappings = [
+  "forge-std/=dependencies/forge-std-1.12.0/src/",
+  "lib/openzeppelin-contracts-upgradeable/contracts/=dependencies/@openzeppelin-contracts-upgradeable-4.8.3/",
+]
+
+# Blur compiled `BlurPool` with solc 0.8.17, 20,000 optimizer runs, the London
+# EVM target, and no metadata hash (per its verified settings). Reproducing
+# those exactly is what lets `test/Fidelity.t.sol` prove that the pristine
+# upstream source in `src/upstream` compiles to the byte-identical runtime code
+# live on mainnet, and it keeps the patched implementation verifiable on
+# Etherscan with Blur's own settings. These settings are restricted to the two
+# `BlurPool.sol` files (and so to the import closure compiled alongside them);
+# everything else, including tests and scripts that import Blur's `IBlurPool`,
+# uses the default profile so that fork tests execute under current mainnet
+# rules rather than London.
+[[profile.default.additional_compiler_profiles]]
+name = "blur"
+optimizer = true
+optimizer_runs = 20000
+evm_version = "london"
+bytecode_hash = "None"
+
+[[profile.default.compilation_restrictions]]
+paths = "src/{pool,upstream/pool}/BlurPool.sol"
+optimizer_runs = 20000
+evm_version = "london"
+bytecode_hash = "None"
+
+# Forked mainnet. Fork tests pin to `FORK_BLOCK` (see the Makefile) so that the
+# stuck balances and Safe nonce they exercise are reproducible. The endpoint
+# must serve historical state.
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC_URL}"
+
+# Recent forge nightlies run `forge lint` automatically after `forge build`.
+# The Blur sources are vendored verbatim and are not ours to restyle.
+[lint]
+lint_on_build = false
+
+# Dependencies (installed via `forge soldeer install`).
+[dependencies]
+forge-std = "1.12.0"
+"@openzeppelin-contracts-upgradeable" = "4.8.3"
+
+[soldeer]
+remappings_generate = false
+remappings_regenerate = false
