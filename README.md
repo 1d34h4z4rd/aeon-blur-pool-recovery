@@ -6,6 +6,16 @@ The [Blur Pool](https://etherscan.io/address/0x0000000000A39bb272e79075ade125fd3
 
 This repository demonstrates that the fix is small and safe. It starts from Blur's exact verified contract, adds a standard `transfer`, and simulates the complete upgrade against forked mainnet: the CreateX deployment, Blur's Safe approving and executing the upgrade, and real stuck receivers distributing their balances through their own unmodified code.
 
+## Deployed
+
+The patched implementation is deployed and verified on Ethereum mainnet at:
+
+**[`0x5b52e91f718904B82b85F061A22615D686c5dC23`](https://etherscan.io/address/0x5b52e91f718904B82b85F061A22615D686c5dC23#code)**
+
+- It was deployed through CreateX's `deployCreate2` in transaction [`0x6e993cd6…7c2333d`](https://etherscan.io/tx/0x6e993cd61fdc109ca0bd4c17a8511fe40bd1ee4ff91b0a58933cba39f7c2333d), at block 26357799.
+- Its runtime code is byte-identical to this repository's build of [`contracts/src/pool/BlurPool.sol`](./contracts/src/pool/BlurPool.sol), constructed with the Blur Pool's four original constructor arguments.
+- It is not live yet. The Blur Pool proxy still points at Blur's original implementation until Blur's Safe executes the single upgrade transaction [below](#what-blur-needs-to-do).
+
 ## The change
 
 `make diff` prints the entire patch against Blur's verified source: one function, one interface line, and one updated doc comment.
@@ -22,7 +32,7 @@ It reuses the contract's existing private `_transfer`, which already rejects the
 
 ## What Blur needs to do
 
-1. **Deploy the implementation.** Anyone can do this, permissionlessly, with `make deploy` (see [Deploying the implementation](#deploying-the-implementation)). CreateX places it at `0x5b52e91f718904B82b85F061A22615D686c5dC23` via `CREATE2`, so the address commits to the exact init code (hash `0x28c7955ddb9cf8d002a00be93e72692d30175d045ce423c1840ba4077dcd857f`): whoever deploys it, that address can only ever hold the reviewed code.
+1. **Deploy the implementation.** This is done (see [Deployed](#deployed)). CreateX placed it at `0x5b52e91f718904B82b85F061A22615D686c5dC23` via `CREATE2`, so the address commits to the exact init code (hash `0x28c7955ddb9cf8d002a00be93e72692d30175d045ce423c1840ba4077dcd857f`): that address can only ever hold the reviewed code.
 2. **Execute one Safe transaction** from the owner Safe [`0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb`](https://etherscan.io/address/0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb) (3-of-5):
    - **To:** `0x0000000000A39bb272e79075ade125fd351887Ac`
    - **Value:** `0`
@@ -32,7 +42,7 @@ It reuses the contract's existing private `_transfer`, which already rejects the
 
 ## Deploying the implementation
 
-The address and init code hash are pinned in [`contracts/script/Deployment.sol`](./contracts/script/Deployment.sol). The deploy script refuses to run if the build differs, so it can only ever deploy the reviewed code to the address shared above.
+The implementation is already deployed; these steps reproduce it, and rerunning `make deploy` against mainnet is a no-op. The address and init code hash are pinned in [`contracts/script/Deployment.sol`](./contracts/script/Deployment.sol). The deploy script refuses to run if the build differs, so it can only ever deploy the reviewed code to the address shared above.
 
 1. Copy `.env.example` to `.env`. Set `MAINNET_RPC_URL` to your own RPC, `PRIVATE_KEY` (or `MNEMONIC`) for a funded deployer, and `ETHERSCAN_API_KEY`.
 2. Run `make test`, then `make deploy-check`. The dry run simulates the deployment against live mainnet without broadcasting, and prints the address, the init code hash, and the estimated cost (about 2.24 million gas).
