@@ -8,6 +8,8 @@ This proposal keeps standard `transfer` support for receivers that can call it a
 
 On a mainnet fork, Blur's 3-of-5 Safe executed the upgrade and paid the Project AEON deployer 2.43877 ETH directly from MoneyPipe's Blur Pool credit. The payout bypasses MoneyPipe's usual split of two thirds to the Project AEON treasury and one third to the artist. Blur should confirm that the parties entitled to those payouts authorize the proposed destination before approving recovery. [MoneyPipe code](https://etherscan.io/address/0xf29A49bCf6135EcfBB3E3DEaCD6052FbE6b596C0#code) · [AEON deployer](https://etherscan.io/address/0x457D955eF9b1E942AE3D7185E69a3EcfBcDD625D) · [Blur Pool Safe](https://etherscan.io/address/0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb)
 
+The artist supports this recovery plan. Project AEON plans to receive the ETH at the deployer wallet first, then transfer it to a new multisig in a separate transaction.
+
 ## Deployment status
 
 The original implementation that adds `transfer` alone was deployed at [`0x5b52e91f718904B82b85F061A22615D686c5dC23`](https://etherscan.io/address/0x5b52e91f718904B82b85F061A22615D686c5dC23#code). The revised implementation's predicted CreateX address is `0xc74ACcF8939b29530CC54499661E5D57729243F1`. At block [26,365,445](https://etherscan.io/block/26365445) the address had no deployed code and the MoneyPipe held 2.43877 ETH of Blur Pool credit. See the [deployment and Safe handoff](./DEPLOYMENT.md) for the two staged transactions.
