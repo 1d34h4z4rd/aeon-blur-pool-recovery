@@ -43,8 +43,16 @@ Record the deployment transaction hash and confirm its receipt succeeded and the
 
 ## 2. Hand off to Blur
 
-Give Blur the repo commit, verified implementation address and deployment transaction hash. Ask its signers to confirm authorization for the direct payout because it bypasses the legacy treasury and artist split.
+Give Blur the repo commit, verified implementation address and deployment transaction hash. Include the payout plan for the transfer to the deployer and the separate handoff to a new multisig. [Proposed payout](./README.md#proposed-payout)
 
-The review payload calls `upgradeToAndCall` on the Blur Pool proxy with a zero-value CALL. It contains `recoverMoneyPipe(2438770000000000000)`, the reviewed 2.43877 ETH at block 26,365,445. Blur should recheck the current balance before collecting signatures. If the balance differs, generate new calldata using the README. Use the fields in the review payload to assemble the proposal in Blur's Safe. [Unsigned Safe review payload](./transactions/blur-safe-review.json) · [Blur Pool Safe](https://etherscan.io/address/0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb)
+The review payload calls `upgradeToAndCall` on the Blur Pool proxy with a zero-value CALL. It contains `recoverMoneyPipe(2438770000000000000)`, the reviewed 2.43877 ETH at block 26,365,445. Blur should recheck the current balance before collecting signatures. Use the fields in the review payload to assemble the proposal in Blur's Safe. [Unsigned Safe review payload](./transactions/blur-safe-review.json) · [Blur Pool Safe](https://etherscan.io/address/0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb)
+
+If the balance differs, set `AMOUNT_WEI` to the reviewed live balance and generate new calldata.
+
+```sh
+RECOVERY_DATA=$(cast calldata 'recoverMoneyPipe(uint256)' "$AMOUNT_WEI")
+cast calldata 'upgradeToAndCall(address,bytes)' \
+  0xc74ACcF8939b29530CC54499661E5D57729243F1 "$RECOVERY_DATA"
+```
 
 After the Safe executes, verify that the proxy points to the reviewed implementation, the MoneyPipe's Blur Pool credit is zero, and the transaction trace shows the expected ETH payment to the deployer. [Blur Pool](https://etherscan.io/address/0x0000000000A39bb272e79075ade125fd351887Ac) · [AEON deployer](https://etherscan.io/address/0x457D955eF9b1E942AE3D7185E69a3EcfBcDD625D)
