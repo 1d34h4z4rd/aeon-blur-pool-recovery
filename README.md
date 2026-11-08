@@ -1,24 +1,20 @@
-# Blur Pool ERC-20 Upgrade
-
-> Let my people go.
+# Project AEON Blur Pool Rescue
 
 The [Blur Pool](https://etherscan.io/address/0x0000000000A39bb272e79075ade125fd351887Ac) is the wrapped Ether that Blur's marketplace pays royalties in. It is upgradeable but not ERC-20 compatible: it has no `transfer` function, so the only way out of it is calling `withdraw` from the holding address. Royalty receivers that are themselves contracts (splitters, conduits, and the like) can only move ERC-20 balances with `transfer`, so the Ether paid to them is stuck.
 
-This repository demonstrates that the fix is small and safe. It starts from Blur's exact verified contract, adds a standard `transfer`, and simulates the complete upgrade against forked mainnet: the CreateX deployment, Blur's Safe approving and executing the upgrade, and real stuck receivers distributing their balances through their own unmodified code.
+This proposal keeps standard `transfer` support for receivers that can call it and adds a recovery for a legacy Project AEON MoneyPipe that cannot. The fork tests cover both recovery paths. [Upstream proposal by TimTinkers](https://github.com/TimTinkers/blur_rescue)
 
-## Deployed
+## Proposed payout
 
-The patched implementation is deployed and verified on Ethereum mainnet at:
+On a mainnet fork, Blur's 3-of-5 Safe executed the upgrade and paid the Project AEON deployer 2.43877 ETH directly from MoneyPipe's Blur Pool credit. The payout bypasses MoneyPipe's usual split of two thirds to the Project AEON treasury and one third to the artist. Blur should confirm that the parties entitled to those payouts authorize the proposed destination before approving recovery. [MoneyPipe code](https://etherscan.io/address/0xf29A49bCf6135EcfBB3E3DEaCD6052FbE6b596C0#code) · [AEON deployer](https://etherscan.io/address/0x457D955eF9b1E942AE3D7185E69a3EcfBcDD625D) · [Blur Pool Safe](https://etherscan.io/address/0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb)
 
-**[`0x5b52e91f718904B82b85F061A22615D686c5dC23`](https://etherscan.io/address/0x5b52e91f718904B82b85F061A22615D686c5dC23#code)**
+## Deployment status
 
-- It was deployed through CreateX's `deployCreate2` in transaction [`0x6e993cd6…7c2333d`](https://etherscan.io/tx/0x6e993cd61fdc109ca0bd4c17a8511fe40bd1ee4ff91b0a58933cba39f7c2333d), at block 26357799.
-- Its runtime code is byte-identical to this repository's build of [`contracts/src/pool/BlurPool.sol`](./contracts/src/pool/BlurPool.sol), constructed with the Blur Pool's four original constructor arguments.
-- It is not live yet. The Blur Pool proxy still points at Blur's original implementation until Blur's Safe executes the single upgrade transaction [below](#what-blur-needs-to-do).
+The original implementation that adds `transfer` alone was deployed at [`0x5b52e91f718904B82b85F061A22615D686c5dC23`](https://etherscan.io/address/0x5b52e91f718904B82b85F061A22615D686c5dC23#code). The revised implementation's predicted CreateX address is `0xc74ACcF8939b29530CC54499661E5D57729243F1`. At block [26,365,445](https://etherscan.io/block/26365445) the address had no deployed code and the MoneyPipe held 2.43877 ETH of Blur Pool credit. See the [deployment and Safe handoff](./DEPLOYMENT.md) for the two staged transactions.
 
 ## The change
 
-`make diff` prints the entire patch against Blur's verified source: one function, one interface line, and one updated doc comment.
+`make diff` prints the contract changes against Blur's verified source.
 
 ```solidity
 function transfer(address to, uint256 amount) external returns (bool) {
@@ -30,22 +26,30 @@ function transfer(address to, uint256 amount) external returns (bool) {
 
 It reuses the contract's existing private `_transfer`, which already rejects the zero address and insufficient balances and emits `Transfer`. `transferFrom` is untouched: it remains callable only by Blur's four contracts, with no allowances. Storage layout, constructor arguments, ownership, and upgradeability are unchanged.
 
+`recoverMoneyPipe(uint256 expectedAmount)` is restricted to the pool owner. It checks that the reviewed amount in wei equals the full nonzero Blur Pool balance of [the legacy MoneyPipe](https://etherscan.io/address/0xf29a49bcf6135ecfbb3e3deacd6052fbe6b596c0), clears that balance, and pays the same amount in native ETH to [the Project AEON deployer](https://etherscan.io/address/0x457D955eF9b1E942AE3D7185E69a3EcfBcDD625D). Both addresses are fixed in the code. If the ETH payment fails, the balance debit reverts. The payout bypasses MoneyPipe's original 2/3 treasury and 1/3 artist split. Any WETH held by MoneyPipe is outside the Blur Pool and cannot be moved by this patch.
+
 ## What Blur needs to do
 
-1. **Deploy the implementation.** This is done (see [Deployed](#deployed)). CreateX placed it at `0x5b52e91f718904B82b85F061A22615D686c5dC23` via `CREATE2`, so the address commits to the exact init code (hash `0x28c7955ddb9cf8d002a00be93e72692d30175d045ce423c1840ba4077dcd857f`): that address can only ever hold the reviewed code.
-2. **Execute one Safe transaction** from the owner Safe [`0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb`](https://etherscan.io/address/0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb) (3-of-5):
-   - **To:** `0x0000000000A39bb272e79075ade125fd351887Ac`
-   - **Value:** `0`
-   - **Data:** `0x3659cfe60000000000000000000000005b52e91f718904b82b85f061a22615d686c5dc23` (`upgradeTo(0x5b52…dC23)`)
+1. **Review the destination and verify the deployed implementation.** A funded Ethereum wallet can deploy the reviewed implementation through CreateX. Blur should verify the code against the pinned build and confirm authorization for paying the deployer directly.
+2. **Verify the current MoneyPipe balance in wei** using `balanceOf(address)` on the pool proxy. At fork block 26357000 the balance was `2438770000000000000` wei (2.43877 ETH). Use the reviewed current amount.
+3. **Execute the upgrade and payout in one call** from the owner Safe [`0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb`](https://etherscan.io/address/0xFA9fB502534761dBDDAcf5B7e2Aa84684815F1bb) (3-of-5). The target is the proxy `0x0000000000A39bb272e79075ade125fd351887Ac`, with value `0`. Encode the data below. The proxy upgrades to the reviewed implementation and then executes recovery as the Safe; a failed payout reverts the upgrade as well.
 
-   `make propose` prints this transaction and its Safe transaction hash at the Safe's live nonce for signers to check against their wallets.
+```sh
+# Example calldata for the fork balance; replace AMOUNT_WEI with the reviewed live amount.
+AMOUNT_WEI=2438770000000000000
+RECOVERY_DATA=$(cast calldata 'recoverMoneyPipe(uint256)' "$AMOUNT_WEI")
+cast calldata 'upgradeToAndCall(address,bytes)' \
+  0xc74ACcF8939b29530CC54499661E5D57729243F1 "$RECOVERY_DATA"
+```
+
+`make propose` still prints a plain upgrade without a payout. Use `upgradeToAndCall` above to execute both together.
 
 ## Deploying the implementation
 
-The implementation is already deployed; these steps reproduce it, and rerunning `make deploy` against mainnet is a no-op. The address and init code hash are pinned in [`contracts/script/Deployment.sol`](./contracts/script/Deployment.sol). The deploy script refuses to run if the build differs, so it can only ever deploy the reviewed code to the address shared above.
+The revised address and init code hash are pinned in [`contracts/script/Deployment.sol`](./contracts/script/Deployment.sol). The deploy script checks the build against both pins. The [deployment handoff](./DEPLOYMENT.md) includes a staged unsigned transaction for signing with a hardware wallet or encrypted keystore.
 
 1. Copy `.env.example` to `.env`. Set `MAINNET_RPC_URL` to your own RPC, `PRIVATE_KEY` (or `MNEMONIC`) for a funded deployer, and `ETHERSCAN_API_KEY`.
-2. Run `make test`, then `make deploy-check`. The dry run simulates the deployment against live mainnet without broadcasting, and prints the address, the init code hash, and the estimated cost (about 2.24 million gas).
+2. Run `make test`, then `make deploy-check`. The dry run simulates the deployment against live mainnet without broadcasting and prints the address, init code hash, and estimated cost.
 3. Run `make deploy`. It deploys through CreateX, then verifies the source on Etherscan with Blur's exact compiler settings. If Etherscan has not indexed the contract yet, rerun `make verify`.
 
 The real deployment's broadcast record is written to `contracts/broadcast/`; fork simulations write to `contracts/broadcast-fork/` instead. Both are ignored by git.
@@ -88,10 +92,11 @@ The 85.01 ETH ends as plain Ether in the same timelock. The test queues the resc
 
 `make test` runs against mainnet forked at block 26357000.
 
-- **Fidelity.** The pristine upstream source in `contracts/src/upstream`, built with Blur's verified settings (solc 0.8.17, 20,000 optimizer runs, London, no metadata hash) and OpenZeppelin Contracts Upgradeable 4.8.3, reproduces the live implementation's runtime code byte for byte, immutables included. The patched contract has an identical storage layout, and its external interface differs only by `transfer`.
+- **Fidelity.** The pristine upstream source in `contracts/src/upstream`, built with Blur's verified settings (solc 0.8.17, 20,000 optimizer runs, London, no metadata hash) and OpenZeppelin Contracts Upgradeable 4.8.3, reproduces the live implementation's runtime code byte for byte, immutables included. The patched contract has an identical storage layout and adds only `transfer` and `recoverMoneyPipe` to the external interface.
 - **Upgrade.** The implementation lands at its precomputed address, cannot be initialized, and is a valid UUPS target. The real Safe approves and executes the upgrade at its live nonce, with a threshold of real owners. The upgrade writes exactly one storage slot of the proxy, the ERC-1967 implementation slot. Balances, supply, metadata, and ownership are unchanged, only the Safe can upgrade, and the Safe can still roll back.
 - **Behavior.** `transfer` works as a standard ERC-20 transfer, including fuzzed amounts and the existing zero-address and balance checks. `deposit`, `deposit(user)`, `withdraw`, `withdrawFrom`, and `transferFrom` keep their exact behavior and authorization.
 - **Rescue.** Each stuck receiver fails today, inside its own `transfer` call, and succeeds after the upgrade. Every recipient can then unwrap its share to Ether. The asset vault is rescued through its real Safe, guard, and timelock, with the delay enforced.
+- **Project AEON.** The Blur Safe executes `upgradeToAndCall` on the fork, paying the deployer exactly 2.43877 ETH and clearing the MoneyPipe's pool balance. Tests cover unauthorized calls, amount mismatch, repeat withdrawal, and reversal if the deployer rejects payment. The existing splitter recipients and MoneyPipe's WETH balance are unchanged by recovery.
 
 The upgrade runs through the same `DeployBlurPool` and `UpgradeBlurPool` script code in tests and in simulation, and the vault rescue through `RescueAssetVault`. The Safe's own threshold and signature verification is never bypassed: a threshold of the real owners (impersonated on the fork) approve the exact transaction hash on-chain with `approveHash`, which is the Safe's approved-hash signature type, and then the Safe's `execTransaction` verifies those approvals at its live nonce. No private keys are needed.
 

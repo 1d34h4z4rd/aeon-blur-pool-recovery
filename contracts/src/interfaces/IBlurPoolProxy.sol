@@ -10,8 +10,8 @@ import { IBlurPool } from "../pool/interfaces/IBlurPool.sol";
   @custom:terry "Is this too much voodoo for the next ten centuries?"
 
   The full external surface of the Blur Pool behind its ERC-1967 proxy: Blur's
-  own `IBlurPool` (including the added `transfer`) plus the public functions it
-  inherits from OpenZeppelin's `OwnableUpgradeable` and `UUPSUpgradeable`.
+  own `IBlurPool` (including `transfer` and recovery) plus functions it inherits
+  from OpenZeppelin's `OwnableUpgradeable` and `UUPSUpgradeable`.
   Tests and scripts use this so that they never import the
   `pragma solidity 0.8.17` implementation itself.
 
@@ -49,4 +49,10 @@ interface IBlurPoolProxy is
   function upgradeTo (
     address _newImplementation
   ) external;
+
+  /// Upgrade and delegatecall the new implementation in the same transaction.
+  function upgradeToAndCall (
+    address _newImplementation,
+    bytes calldata _data
+  ) external payable;
 }

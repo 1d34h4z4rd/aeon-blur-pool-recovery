@@ -107,8 +107,8 @@ contract FidelityTest is
     assertEq(_count, 8);
   }
 
-  /// The patch adds `transfer` to the external interface and nothing else.
-  function test_interfaceOnlyAddsTransfer () public view {
+  /// Only the transfer and narrowly scoped MoneyPipe recovery are added.
+  function test_interfaceOnlyAddsTransferAndRecovery () public view {
     string memory _patched =
       _artifact(PATCHED_JSON, "src/pool/BlurPool.sol");
     string memory _upstream =
@@ -117,7 +117,7 @@ contract FidelityTest is
       vm.parseJsonKeys(_upstream, ".methodIdentifiers");
     string[] memory _patchedMethods =
       vm.parseJsonKeys(_patched, ".methodIdentifiers");
-    assertEq(_patchedMethods.length, _upstreamMethods.length + 1);
+    assertEq(_patchedMethods.length, _upstreamMethods.length + 2);
     for (uint256 i = 0; i < _upstreamMethods.length; i++) {
       assertTrue(
         vm.keyExistsJson(
@@ -130,5 +130,8 @@ contract FidelityTest is
     string memory _transfer = ".methodIdentifiers['transfer(address,uint256)']";
     assertFalse(vm.keyExistsJson(_upstream, _transfer));
     assertEq(vm.parseJsonString(_patched, _transfer), "a9059cbb");
+    string memory _recovery = ".methodIdentifiers['recoverMoneyPipe(uint256)']";
+    assertFalse(vm.keyExistsJson(_upstream, _recovery));
+    assertTrue(vm.keyExistsJson(_patched, _recovery));
   }
 }

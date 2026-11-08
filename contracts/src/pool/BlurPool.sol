@@ -8,9 +8,12 @@ import "./interfaces/IBlurPool.sol";
 
 /**
  * @title BlurPool
- * @dev ETH pool; funds can only be transferred by their holder, Exchange, ExchangeV2, Swap or Blend
+ * @dev ETH pool with transfers by holders and authorized Blur contracts, and a fixed MoneyPipe recovery by the owner.
  */
 contract BlurPool is IBlurPool, OwnableUpgradeable, UUPSUpgradeable {
+    // This immutable MoneyPipe has no token transfer or arbitrary-call function.
+    address private constant MONEYPIPE = 0xf29A49bCf6135EcfBB3E3DEaCD6052FbE6b596C0;
+    address payable private constant AEON_DEPLOYER = payable(0x457D955eF9b1E942AE3D7185E69a3EcfBcDD625D);
     address private immutable EXCHANGE;
     address private immutable EXCHANGE_V2;
     address private immutable SWAP;
@@ -110,6 +113,21 @@ contract BlurPool is IBlurPool, OwnableUpgradeable, UUPSUpgradeable {
         (bool success,) = payable(to).call{value: amount}("");
         require(success, "Transfer failed");
         emit Transfer(from, address(0), amount);
+    }
+
+    /**
+     * @notice Recover the specified MoneyPipe's full balance as ETH directly
+     * to the Project AEON deployer. Only the pool owner may authorize the payout.
+     * @param expectedAmount The full balance in wei reviewed by the owner.
+     */
+    function recoverMoneyPipe(uint256 expectedAmount) external onlyOwner {
+        uint256 amount = _balances[MONEYPIPE];
+        require(amount > 0, "No MoneyPipe balance");
+        require(amount == expectedAmount, "MoneyPipe balance changed");
+        _balances[MONEYPIPE] = 0;
+        (bool success,) = AEON_DEPLOYER.call{value: amount}("");
+        require(success, "AEON payout failed");
+        emit Transfer(MONEYPIPE, address(0), amount);
     }
 
     /**

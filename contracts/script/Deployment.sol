@@ -80,11 +80,11 @@ library Deployment {
     the metadata hash is disabled.
   */
   bytes32 internal constant EXPECTED_INIT_CODE_HASH =
-    0x28c7955ddb9cf8d002a00be93e72692d30175d045ce423c1840ba4077dcd857f;
+    0x35a5742b5e2489a0bfd0ac6e33fb91b872aeb0b3e37319f49c25c6b1343dc1fe;
 
   /// The pinned address of the patched implementation.
   address internal constant EXPECTED_IMPLEMENTATION =
-    0x5b52e91f718904B82b85F061A22615D686c5dC23;
+    0xc74ACcF8939b29530CC54499661E5D57729243F1;
 
   /// The ERC-1967 implementation slot.
   bytes32 internal constant IMPLEMENTATION_SLOT =

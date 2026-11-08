@@ -12,6 +12,7 @@ interface IBlurPool {
     function deposit(address user) external payable;
     function withdraw(uint256 amount) external;
     function withdrawFrom(address from, address to, uint256 amount) external;
+    function recoverMoneyPipe(uint256 expectedAmount) external;
     function transfer(address to, uint256 amount) external returns (bool);
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
